@@ -8,6 +8,41 @@
     <link rel="stylesheet" href="assesment2.css">
     <!-- Font Awesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- NEW: styles for donor name box and donation history -->
+    <style>
+        .donor-name-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px 14px;
+            margin: 12px 0;
+            border: 1px solid #d0d5dd;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        .history-card h3 { margin-top: 0; }
+        .history-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .history-item:last-child { border-bottom: none; }
+        .history-name { font-weight: 600; }
+        .history-time { display: block; font-size: 0.8rem; color: #888; }
+        .history-amount { font-weight: 700; color: #2e7d32; white-space: nowrap; }
+        .history-empty { color: #888; margin: 0; }
+    </style>
 </head>
 <body>
 
@@ -92,6 +127,9 @@
                         <span class="currency-symbol">$</span>
                         <input type="number" id="custom-amount" class="custom-amount-input" placeholder="Custom Amount" min="1">
                     </div>
+
+                    <!-- NEW: donor name -->
+                    <input type="text" id="donor-name" class="donor-name-input" placeholder="Your Name (leave blank for Anonymous)" maxlength="40" autocomplete="name">
                     
                     <button type="submit" class="submit-donation-btn">Donate Now</button>
                 </form>
@@ -105,6 +143,13 @@
                         <span class="donor-badge">Anonymous donated $25</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- NEW: Donation History -->
+            <div class="card history-card">
+                <h3><i class="fa-solid fa-list-check"></i> Donation History</h3>
+                <p id="history-empty" class="history-empty">No donations yet. Be the first to contribute!</p>
+                <ul id="history-list" class="history-list"></ul>
             </div>
 
             <!-- Financial Transparency Ledger -->
@@ -160,7 +205,102 @@
         </div>
     </div>
 
-    <!-- Link to external JavaScript -->
+    <!-- Link to external JavaScript (your original logic) -->
     <script src="assesment2.js"></script>
+
+    <!-- NEW: Donation history logic (works alongside assesment2.js) -->
+    <script>
+    (function () {
+        var KEY = 'reliefDonationHistory';
+        var MAX_ITEMS = 50;
+
+        var form = document.getElementById('donation-form');
+        var customInput = document.getElementById('custom-amount');
+        var nameInput = document.getElementById('donor-name');
+        var listEl = document.getElementById('history-list');
+        var emptyEl = document.getElementById('history-empty');
+        var submitBtn = form.querySelector('.submit-donation-btn');
+
+        var presetAmount = 0;
+        var useCustom = false;
+
+        function loadHistory() {
+            try {
+                return JSON.parse(localStorage.getItem(KEY)) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveHistory(items) {
+            try {
+                localStorage.setItem(KEY, JSON.stringify(items));
+            } catch (e) { /* storage unavailable */ }
+        }
+
+        function render() {
+            var items = loadHistory();
+            listEl.innerHTML = '';
+            emptyEl.style.display = items.length ? 'none' : 'block';
+
+            items.slice().reverse().forEach(function (d) {
+                var li = document.createElement('li');
+                li.className = 'history-item';
+
+                var left = document.createElement('div');
+                var nameEl = document.createElement('span');
+                nameEl.className = 'history-name';
+                nameEl.textContent = d.name;
+                var timeEl = document.createElement('span');
+                timeEl.className = 'history-time';
+                timeEl.textContent = d.time;
+                left.appendChild(nameEl);
+                left.appendChild(timeEl);
+
+                var amountEl = document.createElement('span');
+                amountEl.className = 'history-amount';
+                amountEl.textContent = '$' + d.amount;
+
+                li.appendChild(left);
+                li.appendChild(amountEl);
+                listEl.appendChild(li);
+            });
+        }
+
+        // Track which amount the donor picked
+        document.querySelectorAll('.preset-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                presetAmount = Number(btn.getAttribute('data-amount')) || 0;
+                useCustom = false;
+            });
+        });
+        customInput.addEventListener('input', function () {
+            useCustom = true;
+        });
+
+        // Record the donation when "Donate Now" is clicked
+        // (click fires before submit, so the amount is still filled in)
+        submitBtn.addEventListener('click', function () {
+            var amount = useCustom ? Number(customInput.value) : presetAmount;
+            if (!amount && customInput.value) amount = Number(customInput.value);
+            if (!amount || amount <= 0) return; // nothing selected, don't record
+
+            var name = nameInput.value.trim() || 'Anonymous';
+            var items = loadHistory();
+            items.push({
+                name: name,
+                amount: amount,
+                time: new Date().toLocaleString()
+            });
+            if (items.length > MAX_ITEMS) items = items.slice(-MAX_ITEMS);
+            saveHistory(items);
+            render();
+
+            nameInput.value = '';
+        });
+
+        render();
+    })();
+    </script>
 </body>
 </html>
